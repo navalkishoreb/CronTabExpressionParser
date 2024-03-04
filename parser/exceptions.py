@@ -1,0 +1,2 @@
+class CronTabExpressionParseError(RuntimeError):
+    pass
