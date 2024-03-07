@@ -13,3 +13,21 @@ DEFAULT_SEGMENT_TYPE_ORDER = [
     "COMMAND",
 ]
 DEFAULT_TITLE_FILL_WIDTH = 14
+DEFAULT_SEGMENT_TYPE_PARAMETERS = {
+    "MINUTE": {"title": "minute", "start": 0, "end": 59, "has_range": True},
+    "HOUR": {"title": "hour", "start": 0, "end": 23, "has_range": True},
+    "DAY_OF_THE_MONTH": {
+        "title": "day of month",
+        "start": 1,
+        "end": 31,
+        "has_range": True,
+    },
+    "MONTH": {"title": "month", "start": 1, "end": 12, "has_range": True},
+    "DAY_OF_THE_WEEK": {
+        "title": "day of week",
+        "start": 0,
+        "end": 6,
+        "has_range": True,
+    },
+    "COMMAND": {"title": "command", "has_range": False},
+}

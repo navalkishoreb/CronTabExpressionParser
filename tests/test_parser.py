@@ -1,13 +1,15 @@
 import pytest
 
 from parser import CronTabExpressionParseError
-from parser.models import CronJob
 from parser.transformers import (
     transform_input_expression_into_segment_text,
-    transform_cron_segment_text_to_applicable_list_of_values,
+    transform_segment_text_to_applicable_values,
     parse_single_integer,
     parse_range_segment,
     parse_list_segment,
+    transform_cron_expression_to_cron_job,
+    parse_step_segment,
+    transform_segment_text_to_cron_segment,
 )
 
 
@@ -84,20 +86,54 @@ def test_select_single_integer(segment_text, segment_range, expected):
         [
             "1",
             [7, 8, 9],
-            CronTabExpressionParseError(
-                "Expected 1 not in segment range segment_range = [7, 8, 9]"
-            ),
+            CronTabExpressionParseError("Expected value 1 in segment range [7, 8, 9]"),
         ],
         [
             "1l",
             [0, 1, 2],
             CronTabExpressionParseError("Expected integer in segment text '1l'"),
         ],
+        [
+            "",
+            [0, 1, 2],
+            CronTabExpressionParseError("Received empty segment text. Expected digits"),
+        ],
+        [
+            None,
+            [0, 1, 2],
+            CronTabExpressionParseError("Received None segment text. Expected digits"),
+        ],
     ],
 )
 def test_select_single_integer_raises_error(segment_text, segment_range, expected):
     with pytest.raises(CronTabExpressionParseError) as exec_info:
         _ = parse_single_integer(segment_text=segment_text, segment_range=segment_range)
+    assert isinstance(exec_info.value, CronTabExpressionParseError)
+    assert exec_info.value.args == expected.args
+
+
+@pytest.mark.parametrize(
+    argnames=[
+        "segment_text",
+        "segment_range",
+        "expected",
+    ],
+    argvalues=[
+        [
+            "*2",
+            [7, 8, 9],
+            CronTabExpressionParseError("Expected delimiter '/' in '*2'"),
+        ],
+        [
+            "*/a",
+            [0, 1, 2],
+            CronTabExpressionParseError("Received malformed step value 'a'"),
+        ],
+    ],
+)
+def test_parse_step_segment_raises_error(segment_text, segment_range, expected):
+    with pytest.raises(CronTabExpressionParseError) as exec_info:
+        _ = parse_step_segment(segment_text=segment_text, segment_range=segment_range)
     assert isinstance(exec_info.value, CronTabExpressionParseError)
     assert exec_info.value.args == expected.args
 
@@ -200,7 +236,7 @@ def test_parse_list_segment(segment_text, segment_range, expected):
             "13,14",
             [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
             CronTabExpressionParseError(
-                "Expected 13 not in segment range segment_range = [0, 1, 2, 3, 4, 5, 6, 7, 8, "
+                "Expected value 13 in segment range [0, 1, 2, 3, 4, 5, 6, 7, 8, "
                 "9, 10]",
             ),
         ],
@@ -225,10 +261,48 @@ def test_parse_list_segment_raises_error(segment_text, segment_range, expected):
 def test_transform_cron_segment_text_to_applicable_list_of_values(
     segment_text, segment_range, expected
 ):
-    actual = transform_cron_segment_text_to_applicable_list_of_values(
+    actual = transform_segment_text_to_applicable_values(
         segment_text=segment_text, segment_range=segment_range
     )
     assert actual == expected
+
+
+@pytest.mark.parametrize(
+    argnames=["segment_text", "segment_range", "expected"],
+    argvalues=[
+        ["1", [], CronTabExpressionParseError("Expected value 1 in segment range []")],
+        ["", [], CronTabExpressionParseError("Provide segment text")],
+        ["", [1], CronTabExpressionParseError("Provide segment text")],
+        ["1", None, CronTabExpressionParseError("Provide segment range")],
+    ],
+)
+def test_transform_segment_text_to_applicable_values_raise_error(
+    segment_text, segment_range, expected
+):
+    with pytest.raises(CronTabExpressionParseError) as actual:
+        transform_segment_text_to_applicable_values(
+            segment_text=segment_text, segment_range=segment_range
+        )
+
+    assert actual.value.args == expected.args
+
+
+@pytest.mark.parametrize(
+    argnames=["segment_type", "segment_text", "expected"],
+    argvalues=[
+        ["", "1", CronTabExpressionParseError("Segment type '' not implemented")],
+        [None, "1", CronTabExpressionParseError("Segment type None not implemented")],
+    ],
+)
+def test_transform_segment_text_to_cron_segment_raise_error(
+    segment_type, segment_text, expected
+):
+    with pytest.raises(CronTabExpressionParseError) as actual:
+        transform_segment_text_to_cron_segment(
+            segment_type=segment_type, segment_text=segment_text
+        )
+
+    assert actual.value.args == expected.args
 
 
 @pytest.mark.parametrize(
@@ -260,5 +334,22 @@ def test_transform_cron_segment_text_to_applicable_list_of_values(
     ],
 )
 def test_cron_job(expression, expected):
-    actual = CronJob(expression=expression)
+    actual = transform_cron_expression_to_cron_job(expression=expression)
     assert str(actual) == expected
+
+
+@pytest.mark.parametrize(
+    argnames=["expression", "expected"],
+    argvalues=[
+        [
+            "*/15 /usr/bin/find",
+            CronTabExpressionParseError(
+                "Received 2 segments, expected 6.\nsegments =['*/15', '/usr/bin/find']"
+            ),
+        ],
+    ],
+)
+def test_cron_job_raise_error(expression, expected):
+    with pytest.raises(CronTabExpressionParseError) as actual:
+        _ = transform_cron_expression_to_cron_job(expression=expression)
+    assert actual.value.args == expected.args

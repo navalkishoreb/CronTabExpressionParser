@@ -8,6 +8,15 @@ from parser.config import (
     DEFAULT_LIST_DELIMITER,
     DEFAULT_RANGE_DELIMITER,
     DEFAULT_ALL_SELECTOR,
+    DEFAULT_SEGMENT_TYPE_ORDER,
+    DEFAULT_SEGMENT_TYPE_PARAMETERS,
+)
+from parser.models import (
+    CronSegment,
+    CronJob,
+    CommandCronSegment,
+    SegmentParams,
+    ScheduleCronSegment,
 )
 
 
@@ -24,7 +33,7 @@ def parse_single_integer(segment_text: str, segment_range: List[int]) -> List[in
             return [single_integer]
         else:
             raise CronTabExpressionParseError(
-                f"Expected {single_integer} not in segment range {segment_range = !r}"
+                f"Expected value {single_integer!r} in segment range {segment_range!r}"
             )
     except ValueError:
         raise CronTabExpressionParseError(
@@ -103,17 +112,17 @@ def parse_step_segment(
             f"Received malformed step value {step_string !r}"
         )
     segment_range = [item for item in segment_range if item % step == 0]
-    return transform_cron_segment_text_to_applicable_list_of_values(
+    return transform_segment_text_to_applicable_values(
         segment_text=remaining_segment_text, segment_range=segment_range
     )
 
 
-def transform_cron_segment_text_to_applicable_list_of_values(
+def transform_segment_text_to_applicable_values(
     segment_text: str, segment_range: List[int]
 ) -> List[int]:
     if not segment_text:
         raise CronTabExpressionParseError("Provide segment text")
-    if not segment_range:
+    if segment_range is None:
         raise CronTabExpressionParseError(f"Provide segment range")
 
     if DEFAULT_STEP_DELIMITER in segment_text:
@@ -160,3 +169,43 @@ def transform_input_expression_into_segment_text(
         )
 
     return segments
+
+
+def transform_input_segments_to_cron_segments(
+    segments: List[str], segment_order: List[str]
+):
+    cron_segments = []
+    for segment_type, segment_text in zip(segment_order, segments):
+        cron_segment = transform_segment_text_to_cron_segment(
+            segment_type=segment_type, segment_text=segment_text
+        )
+        cron_segments.append(cron_segment)
+    return cron_segments
+
+
+def transform_cron_expression_to_cron_job(expression: str) -> CronJob:
+    segments = transform_input_expression_into_segment_text(expression=expression)
+    cron_segments = transform_input_segments_to_cron_segments(
+        segments=segments, segment_order=DEFAULT_SEGMENT_TYPE_ORDER
+    )
+
+    return CronJob(cron_segments=cron_segments)
+
+
+def transform_segment_text_to_cron_segment(segment_type, segment_text) -> CronSegment:
+    segment_params = DEFAULT_SEGMENT_TYPE_PARAMETERS.get(segment_type, None)
+    if not segment_params:
+        raise CronTabExpressionParseError(
+            f"Segment type {segment_type !r} not implemented"
+        )
+
+    params = SegmentParams(**segment_params)
+    if params.has_range:
+        applicable_values = transform_segment_text_to_applicable_values(
+            segment_text=segment_text, segment_range=params.get_segment_range()
+        )
+        return ScheduleCronSegment(
+            applicable_values=applicable_values, title=params.title
+        )
+    else:
+        return CommandCronSegment(title=params.title, command=segment_text)
