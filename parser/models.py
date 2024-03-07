@@ -50,14 +50,15 @@ class SegmentParams:
     end: Optional[int] = None
 
     def __post_init__(self):
-        if (
-            self.has_range
-            and (self.start is not None or self.end is not None)
-            and (self.start > self.end)
-        ):
-            raise CronTabExpressionParseError(
-                f"Provide proper start {self.start !r} and end {self.end !r} range"
-            )
+        if self.has_range:
+            if self.start is None or self.end is None:
+                raise CronTabExpressionParseError(
+                    f"Provide proper start {self.start !r} and end {self.end !r} range"
+                )
+            if self.start > self.end:
+                raise CronTabExpressionParseError(
+                    f"Range start {self.start!r} is greater then end {self.end!r} "
+                )
 
     def get_segment_range(self):
         return list(range(self.start, self.end + 1))
