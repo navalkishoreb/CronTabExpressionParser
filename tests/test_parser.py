@@ -347,6 +347,14 @@ def test_cron_job(expression, expected):
                 "Received 2 segments, expected 6.\nsegments =['*/15', '/usr/bin/find']"
             ),
         ],
+        [
+            "*/61 */2 */2 */2 */2 /bin/bash collect_metrics.sh",
+            CronTabExpressionParseError("Step value 61 is out of bounds"),
+        ],
+        [
+            "*/0 */2 */2 */2 */2 /bin/bash collect_metrics.sh",
+            CronTabExpressionParseError("Step value cannot be zero"),
+        ],
     ],
 )
 def test_cron_job_raise_error(expression, expected):

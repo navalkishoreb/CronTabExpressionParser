@@ -107,6 +107,10 @@ def parse_step_segment(
     )
     try:
         step = int(step_string)
+        if not step:
+            raise CronTabExpressionParseError(f"Step value cannot be zero")
+        if step not in segment_range:
+            raise CronTabExpressionParseError(f"Step value {step!r} is out of bounds")
     except ValueError:
         raise CronTabExpressionParseError(
             f"Received malformed step value {step_string !r}"
